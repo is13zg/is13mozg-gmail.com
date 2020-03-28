@@ -17,6 +17,9 @@ def main():
     login_manager.init_app(app)
     app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
     app.register_blueprint(news_api.blueprint)
+    global sorting, filtering
+    sorting = None
+    filtering = None
 
     @app.errorhandler(404)
     def not_found(error):
@@ -75,18 +78,37 @@ def main():
     @app.route("/", methods=['GET', 'POST'])
     def index():
 
+        global sorting, filtering
+
+        print("old")
+        print(sorting)
+        print(filtering)
+
         form = SortForm()
-        value = dict(form.sort.choices).get(form.sort.data)
+        if form.submit():
+            sorting = dict(form.sort.choices).get(form.sort.data)
 
         form2 = FilterForm()
-        value2 = dict(form2.filter.choices).get(form2.filter.data)
+        if dict(form2.filter.choices).get(form2.filter.data) != None:
+            filtering = dict(form2.filter.choices).get(form2.filter.data)
+
+        print("new")
+        print(sorting)
+        print(filtering)
+
+        form.sort.default = "1"
+        form2.filter.default="1"
+
+        print("set default")
+        print(sorting)
+        print(filtering)
+
 
         session = db_session.create_session()
 
-        if value2 == "Неделя":
-            now = datetime.datetime.now()
+        if filtering == "Неделя":
             filter_date = datetime.datetime.now() - datetime.timedelta(weeks=1)
-        elif value2 == "Месяц":
+        elif filtering == "Месяц":
             filter_date = datetime.datetime.now() - datetime.timedelta(days=30)
         else:
             filter_date = datetime.datetime.now() - datetime.timedelta(days=5000)
@@ -105,11 +127,12 @@ def main():
             x['comments'] = comments
             ls.append(x)
 
-        if value == "По рейтингу":
+
+
+        if sorting == "По рейтингу":
             ls.sort(key=lambda x: x['rate'], reverse=True)
-        elif value == "По дате":
+        elif sorting == "По дате":
             ls.sort(key=lambda x: x['created_date'], reverse=True)
-        print(ls)
         return render_template("index.html", news=ls, form=form, form2=form2)
 
     @app.route('/news/<int:id>', methods=['GET', 'POST'])
