@@ -28,12 +28,12 @@ class NewsForm(FlaskForm):
 
 
 class SortForm(FlaskForm):
-    sort = SelectField('Сортировка', choices=[('1', 'По рейтингу'), ('2', 'По дате')])
+    sort = SelectField('Сортировка', choices=[('1', 'По рейтингу'), ('2', 'По дате')], default="2")
     submit = SubmitField('Сортировка')
 
 
 class FilterForm(FlaskForm):
-    filter = SelectField('Фильтр', choices=[('1', 'Неделя'), ('2', 'Месяц'), ('3', 'Все время')])
+    filter = SelectField('Фильтр', choices=[('1', 'Неделя'), ('2', 'Месяц'), ('3', 'Все время')], default="3")
     submit = SubmitField('Фильтр')
 
 

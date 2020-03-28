@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request, make_response, jsonify, flash
+from flask import Flask, render_template, redirect, request, make_response, jsonify, flash, abort
 from data import db_session, news_api
 import datetime
 from data.users import User
@@ -60,53 +60,17 @@ def main():
                                    form=form)
         return render_template('login.html', title='Авторизация', form=form)
 
-    def count_rate(news_id, data_s = 0, data_f = 0):
+    def count_rate(news_id, data_s=0, data_f=0):
         rate = 0
         if data_f == data_s:
             session = db_session.create_session()
-            likes = session.query(Likes).filter(Likes.news_id ==news_id)
+            likes = session.query(Likes).filter(Likes.news_id == news_id)
             for like in likes:
                 rate += like.like_point
         else:
             pass
             # count rate in date
         return rate
-
-
-    def get_sorted_index(form, value, form2, value2):
-        session = db_session.create_session()
-
-        if value2 == "Неделя":
-            now = datetime.datetime.now()
-            filter_date= datetime.datetime.now() - datetime.timedelta(weeks=1)
-        elif value2 == "Месяц":
-            filter_date = datetime.datetime.now() - datetime.timedelta(days=30)
-        else:
-            filter_date = datetime.datetime.now() - datetime.timedelta(days=5000)
-
-
-        if current_user.is_authenticated:
-            news = session.query(News).filter(
-                (News.user == current_user) | (News.is_private != True)).filter(News.created_date> filter_date)
-        else:
-            news = session.query(News).filter(News.is_private != True).filter(News.created_date> filter_date)
-
-        ls = []
-        for one_news in news:
-            x = one_news.to_dict(only=('id', 'title', 'content', 'user.name', 'user.id', 'created_date'))
-            x['rate'] = count_rate(x['id'])
-            ls.append(x)
-
-        if value == "По рейтингу":
-            ls.sort(key=lambda x: x['rate'], reverse=True)
-        elif value == "По дате":
-            ls.sort(key=lambda x: x['created_date'], reverse=True)
-
-
-
-
-        return render_template("index.html", news=ls, form=form, form2 = form2)
-
 
     @app.route("/", methods=['GET', 'POST'])
     def index():
@@ -117,9 +81,36 @@ def main():
         form2 = FilterForm()
         value2 = dict(form2.filter.choices).get(form2.filter.data)
 
+        session = db_session.create_session()
 
-        return  get_sorted_index(form,value, form2, value2)
+        if value2 == "Неделя":
+            now = datetime.datetime.now()
+            filter_date = datetime.datetime.now() - datetime.timedelta(weeks=1)
+        elif value2 == "Месяц":
+            filter_date = datetime.datetime.now() - datetime.timedelta(days=30)
+        else:
+            filter_date = datetime.datetime.now() - datetime.timedelta(days=5000)
 
+        if current_user.is_authenticated:
+            news = session.query(News).filter(
+                (News.user == current_user) | (News.is_private != True)).filter(News.created_date > filter_date)
+        else:
+            news = session.query(News).filter(News.is_private != True).filter(News.created_date > filter_date)
+
+        ls = []
+        for one_news in news:
+            x = one_news.to_dict(only=('id', 'title', 'content', 'user.name', 'user.id', 'created_date'))
+            x['rate'] = count_rate(x['id'])
+            comments = session.query(Comments).filter(Comments.news_id == x['id'])
+            x['comments'] = comments
+            ls.append(x)
+
+        if value == "По рейтингу":
+            ls.sort(key=lambda x: x['rate'], reverse=True)
+        elif value == "По дате":
+            ls.sort(key=lambda x: x['created_date'], reverse=True)
+        print(ls)
+        return render_template("index.html", news=ls, form=form, form2=form2)
 
     @app.route('/news/<int:id>', methods=['GET', 'POST'])
     @login_required
@@ -166,22 +157,21 @@ def main():
         return render_template('news.html', title='Добавление новости',
                                form=form)
 
-
-    @app.route('/add_comment', methods=['GET', 'POST'])
+    @app.route('/add_comment/<int:id>', methods=['GET', 'POST'])
     @login_required
-    def add_comment():
+    def add_comment(id):
         form = CommentForm()
         if form.validate_on_submit():
             session = db_session.create_session()
-            comment= Comments()
+            comment = Comments()
             comment.text = form.text.data
+            comment.news_id = id
             current_user.comments.append(comment)
             session.merge(current_user)
             session.commit()
             return redirect('/')
         return render_template('comments.html', title='Добавление комментария',
                                form=form)
-
 
     def like(id, point):
         print("point= ", point)
